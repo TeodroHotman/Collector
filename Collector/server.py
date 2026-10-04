@@ -1,14 +1,17 @@
 import json
+import uuid
+from pathlib import Path
+
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
-
 from search import search_source
 
 app = FastAPI()
 
-final_data = {}
-
+COLLECTIONS_DIR = Path("data/collections")
+COLLECTIONS_DIR.mkdir(parents=True, exist_ok=True)
+latest_collection_id = None
 
 class searchRequest(BaseModel):
     websites: list[str] = Field(default_factory=list)
@@ -38,10 +41,39 @@ def finalize_data(sources, information):
 
 @app.post("/finalize")
 async def finalize_post(request: FinalRequest):
-    global final_data
-    final_data = finalize_data(request.sources, request.information)
-    return final_data
+    global latest_collection_id
+    collection_id = str(uuid.uuid4())
+    latest_collection_id = collection_id
+
+    data = {"collection_id": collection_id, "sources": request.sources, "information": request.information}
+
+    file_path = COLLECTIONS_DIR / f"{collection_id}.json"
+
+    with open(file_path, "w", encoding="utf-8") as file:
+        json.dump(data, file, indent=4, ensure_ascii=False)
+    return data
+
+@app.get("/collections/{collection_id}")
+def get_collection(collection_id: str):
+    file_path = COLLECTIONS_DIR / f"{collection_id}.json"
+
+    if not file_path.exists():
+        return {"error": "Collection not found"}
+
+    with open(file_path, "r", encoding="utf-8") as file:
+        return json.load(file)
+    return data
 
 @app.get("/final-data")
 def get_final_data():
-    return final_data
+    if latest_collection_id is None:
+        return {
+            "sources": [],
+            "information": []
+        }
+
+    file_path = COLLECTIONS_DIR / f"{latest_collection_id}.json"
+
+    with open(file_path, "r", encoding="utf-8") as file:
+        return json.load(file)
+    return data
