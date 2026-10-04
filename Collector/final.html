@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Final Results</title>
+</head>
+
+<body>
+
+    <h1>Final Results</h1>
+
+    <h2>Selected Sources</h2>
+    <div id="sources"></div>
+
+    <h2>Selected Information</h2>
+    <div id="information"></div>
+
+    <button onclick="window.location.href='/'">Back to Search</button>
+
+    <script>
+        fetch("/final-data")
+            .then(response => response.json())
+            .then(data => {
+                const sources = document.getElementById("sources");
+                const information = document.getElementById("information");
+
+                data.sources.forEach(source => {
+                    const item = document.createElement("p");
+                    item.textContent = source;
+                    sources.appendChild(item);
+                });
+
+                data.information.forEach(info => {
+                    const item = document.createElement("p");
+                    item.textContent = info;
+                    information.appendChild(item);
+                });
+            });
+    </script>
+
+</body>
+</html>

@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Collector</title>
+    </head>
+    <body>
+        <h1>Information Collector</h1>
+        <p>Please enter the keywords or topics you want to find!</p>
+
+        <section>
+            <h2>Sources / 'Keys':</h2>
+            <p>Websites are not compulsory to enter, but the other two should be!</p>
+            <input type="text" id="websites" placeholder="Enter the wanted websites">
+            <br><br>
+            <textarea id="keywords" placeholder="Type the relevant keywords"></textarea>
+            <br><br>
+            <textarea id="topics" placeholder="Fill in the needed topics"></textarea>
+            <br><br>
+            <button id="searchButton">Search</button>
+        </section>
+
+        <section>
+            <h2>Temporary Results:</h2>
+            <div id="results"></div>
+        </section>
+
+        <section>
+            <h2>Potential Sources:</h2>
+            <p>Select the websites you want to be used as citing:</p>
+            <div id="websitesResults"></div>
+            <br><br>
+            <h3>Selected Sources:</h3>
+            <div id="selectedSources"></div>
+            <br><br>
+            <h3>Selected Information:</h3>
+            <div id="selectedInformation"></div>
+        </section>
+
+        <section>
+            <h2>Finalized Options</h2>
+            <p>Build the final results!</p>
+            <div id="collectedBox"></div>
+            <br><br>
+            <button id="newCollectionButton">Start New Collection</button>
+            <button id="finalizeButton">Finalize</button>
+        </section>
+    </body>
+    <script>
+        const searchButton = document.getElementById("searchButton");
+        const finalizeButton = document.getElementById("finalizeButton");
+        const newCollectionButton = document.getElementById("newCollectionButton");
+
+        function splitInput(text) {
+            return text
+            .split(/[,;\n]/)
+            .map(item => item.trim())
+            .filter(item => item !== "");
+        }
+
+        let selectedSources = JSON.parse(sessionStorage.getItem("selectedSources")) || [];
+        let selectedInformation = JSON.parse(sessionStorage.getItem("selectedInformation")) || [];
+        displaySelectedSources();
+        displaySelectedInformation();
+
+        searchButton.addEventListener("click", async function() {
+            const manuallyEnteredWebsites = splitInput(document.getElementById("websites").value);
+            const keywords = splitInput(document.getElementById("keywords").value);
+            const topics = splitInput(document.getElementById("topics").value);
+
+            const response = await fetch("/search", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({websites: selectedSources.length > 0
+                    ? selectedSources
+                    : manuallyEnteredWebsites,
+                    keywords: keywords,
+                    topics: topics,
+                })
+            });
+            const data = await response.json();
+            displayResults(data.results);
+        });
+
+        function displayResults(results) {
+            const resultContainer = document.getElementById("results");
+            resultContainer.innerHTML = "";
+
+            results.forEach(result => {
+                const resultBox = document.createElement("div");
+
+                const title = document.createElement("h3");
+                title.textContent = result.title;
+
+                const source = document.createElement("p");
+                source.textContent = "Sources:" + result.source;
+
+                const preview = document.createElement("p");
+                preview.textContent = result.preview;
+
+                const sourceButton = document.createElement("button");
+                sourceButton.textContent = "Select Source";
+
+                const informationButton = document.createElement("button");
+                informationButton.textContent = "Select information";
+
+                const openButton = document.createElement("a");
+                openButton.textContent = "Open";
+                openButton.href = result.url;
+                openButton.target = "_blank";
+
+                sourceButton.addEventListener("click", function() {
+                    if (!selectedSources.includes(result.source)) {
+                        selectedSources.push(result.source);
+                    } else {
+                        selectedSources = selectedSources.filter(source => source !== result.source);
+                    }
+                    saveSelections();
+                    displaySelectedSources();
+                });
+                informationButton.addEventListener("click", function() {
+                    if(!selectedInformation.includes(result.url)) {
+                        selectedInformation.push(result.url);
+                    } else {
+                        selectedInformation = selectedInformation.filter(url => url !== result.url);
+                    }
+                    saveSelections();
+                    displaySelectedInformation();
+                });
+
+                resultBox.appendChild(title);
+                resultBox.appendChild(source);
+                resultBox.appendChild(preview);
+
+                resultBox.appendChild(sourceButton);
+                resultBox.appendChild(informationButton);
+                resultBox.appendChild(openButton);
+
+                resultContainer.appendChild(resultBox);
+            });
+        }
+
+        function saveSelections () {
+            sessionStorage.setItem("selectedSources", JSON.stringify(selectedSources));
+            sessionStorage.setItem("selectedInformation", JSON.stringify(selectedInformation));
+        }
+
+        function displaySelectedSources() {
+            const container = document.getElementById("selectedSources");
+            container.innerHTML = "";
+
+            selectedSources.forEach(source => {
+                const item = document.createElement("p");
+                item.textContent = "✓" + source;
+                container.appendChild(item);
+            });
+        }
+
+        function displaySelectedInformation() {
+            const container = document.getElementById("selectedInformation");
+            container.innerHTML = "";
+
+            selectedInformation.forEach(url => {
+                const item = document.createElement("p");
+                item.textContent = "✓" + url;
+                container.appendChild(item);
+            });
+        }
+
+        newCollectionButton.addEventListener("click", async function () {
+            sessionStorage.clear();
+
+            selectedSources = [];
+            selectedInformation = [];
+            document.getElementById("websites").value = "";
+            document.getElementById("keywords").value = "";
+            document.getElementById("topics").value = "";
+
+            displaySelectedSources = [];
+            displaySelectedInformation = [];
+        });
+
+        finalizeButton.addEventListener("click", async function() {
+            const response = await fetch("/finalize", {
+                method: "POST",
+                headers: {"Content-Type" : "application/json"},
+                body: JSON.stringify({sources: selectedSources, information: selectedInformation})
+            });
+            if (response.ok) {window.location.href = "/final";}
+        });
+    </script>
+</html>
